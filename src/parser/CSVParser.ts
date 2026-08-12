@@ -56,32 +56,36 @@ function cleanCell(raw: string): string {
 
 // ─── Numeric value parsing ──────────────────────────────────────────────────────
 
-// Handles CRC-prefixed values ("CRC 1,234.56"), negative forms ("-CRC 500"),
-// and thousands-separator commas. Returns null for empty or non-numeric cells.
+// Handles any currency-prefixed value ("CRC 1,234.56", "₡1,234.56", "$1,234.56"),
+// negative forms regardless of where the minus sign or symbol sits
+// ("-CRC 500", "- ₡802,270.96", "-₡500", "(₡500)"), and thousands-separator commas.
+// Returns null for empty or non-numeric cells.
 function parseValue(raw: string): number | null {
   const cell = cleanCell(raw)
-  if (!cell || cell === '0.00' && raw.trim() === '0.00') {
-    if (!cell) return null
-  }
+  if (!cell) return null
 
-  let s = cell
+  let s = cell.trim()
   let negative = false
 
-  // Handle "-CRC 1234" form (minus before currency prefix)
-  if (s.startsWith('-')) {
-    const after = s.slice(1).trimStart()
-    if (/^CRC/i.test(after)) {
-      negative = true
-      s = after
-    }
+  // Accounting-style negatives: "(1,234.56)"
+  const parenMatch = s.match(/^\((.*)\)$/)
+  if (parenMatch) {
+    negative = true
+    s = parenMatch[1]
   }
 
-  // Strip CRC prefix
-  s = s.replace(/^CRC\s*/i, '').trim()
+  // Leading minus sign, regardless of what currency symbol/spacing follows
+  // (e.g. "-150,342.74", "-CRC 500", "- ₡802,270.96", "-₡500")
+  if (s.startsWith('-')) {
+    negative = true
+    s = s.slice(1).trimStart()
+  }
 
-  // Strip thousands-separator commas
-  s = s.replace(/,/g, '')
+  // Strip any currency symbol/text and thousands-separator commas, keeping only
+  // digits and the decimal point
+  s = s.replace(/[^0-9.]/g, '')
 
+  if (!s) return null
   const num = parseFloat(s)
   if (isNaN(num)) return null
   return negative ? -num : num
@@ -91,12 +95,38 @@ function parseValue(raw: string): number | null {
 
 // Determines whether a row is a leaf metric, a subtotal, a key summary line,
 // or a footer row (marks end of useful data).
+const SUMMARY_ROW_NAMES = ['beneficio bruto', 'net earnings', 'ganancias netas', 'beneficio neto']
+
 function classifyRow(name: string): MetricRowType | 'header' | 'footer' {
   const lower = name.toLowerCase()
   if (lower.startsWith('accrual basis')) return 'footer'
   if (lower.startsWith('total para')) return 'subtotal'
-  if (name === 'Beneficio bruto' || name === 'Net earnings') return 'summary'
+  if (SUMMARY_ROW_NAMES.includes(lower)) return 'summary'
   return 'leaf'
+}
+
+// ─── Header row detection ────────────────────────────────────────────────────────
+
+// Scans down from the top of the file to find the row containing month-header
+// labels, since QuickBooks exports sometimes have title/metadata rows above it
+// (company name, report title, date range, blank line).
+function findHeaderRow(rows: string[][]): { headerIdx: number; dates: string[]; dateColIdx: number[] } {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row || row.length < 2) continue
+
+    const dates: string[] = []
+    const dateColIdx: number[] = []
+    for (let j = 1; j < row.length; j++) {
+      const d = parseMonthLabel(cleanCell(row[j] || ''))
+      if (d) { dates.push(d); dateColIdx.push(j) }
+    }
+
+    // Require at least 2 recognized month columns to avoid false-positives on data rows
+    if (dates.length >= 2) return { headerIdx: i, dates, dateColIdx }
+  }
+
+  throw new Error('No se encontraron columnas de fecha en el CSV')
 }
 
 // ─── Main parse function ────────────────────────────────────────────────────────
@@ -109,22 +139,14 @@ export function parseCSV(csvText: string, companyName: string): ParsedReport {
 
   if (rows.length < 2) throw new Error('CSV vacío o sin datos')
 
-  // Parse date columns from header row
-  const headerRow = rows[0]
-  const dates: string[] = []
-  const dateColIdx: number[] = []
-
-  for (let i = 1; i < headerRow.length; i++) {
-    const d = parseMonthLabel(cleanCell(headerRow[i] || ''))
-    if (d) { dates.push(d); dateColIdx.push(i) }
-  }
-
-  if (dates.length === 0) throw new Error('No se encontraron columnas de fecha en el CSV')
+  // Locate the header row (month columns) — may not be row 0 if the export has
+  // title/metadata rows above it (company name, report title, date range, ...)
+  const { headerIdx, dates, dateColIdx } = findHeaderRow(rows)
 
   const metrics: MetricRow[] = []
   let currentSection = ''
 
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i]
     if (!row?.length) continue
 
