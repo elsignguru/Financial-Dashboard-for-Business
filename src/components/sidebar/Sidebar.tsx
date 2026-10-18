@@ -1,10 +1,14 @@
 // Left sidebar — lists all loaded companies (with per-company metric visibility controls)
-// and all user-defined derived metrics. Also houses the CSV upload zone.
-import { useState } from 'react'
+// and all user-defined derived metrics. Also houses the QuickBooks connection panel.
+import { useState, type MouseEvent } from 'react'
+import { formatDistanceToNow } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { useDataStore } from '../../store/useDataStore'
 import { useMetricStore } from '../../store/useMetricStore'
-import UploadZone from '../upload/UploadZone'
+import CompaniesPanel from '../companies/CompaniesPanel'
 import DerivedMetricModal from './DerivedMetricModal'
+import { syncCompanyNow } from '../../lib/qboApi'
+import { loadCompanies } from '../../data/loadCompanies'
 
 // ─── CompanySection ─────────────────────────────────────────────────────────────
 // Collapsible card for a single company. Shows metric count, a search box,
@@ -20,8 +24,31 @@ function CompanySection({ companyId }: { companyId: string }) {
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState(company?.name ?? '')
   const [search, setSearch] = useState('')
+  const [syncing, setSyncing] = useState(false)
 
   if (!company) return null
+
+  const handleSyncNow = async (e: MouseEvent) => {
+    e.stopPropagation()
+    setSyncing(true)
+    try {
+      await syncCompanyNow(companyId)
+      await loadCompanies()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const statusColor = company.qboStatus === 'error' ? 'bg-red-500'
+    : company.qboStatus === 'disconnected' ? 'bg-gray-300'
+    : 'bg-green-500'
+  const statusTitle = company.qboStatus === 'error'
+    ? (company.lastSyncError || 'Error de sincronización')
+    : company.lastSyncedAt
+      ? `Sincronizado ${formatDistanceToNow(new Date(company.lastSyncedAt), { addSuffix: true, locale: es })}`
+      : 'Aún no sincronizado'
 
   // Build a section → metric name map filtered by the current search query.
   const grouped: Record<string, string[]> = {}
@@ -47,13 +74,17 @@ function CompanySection({ companyId }: { companyId: string }) {
             className="flex-1 text-sm border border-blue-400 rounded px-1 py-0.5 focus:outline-none"
           />
         ) : (
-          <button onClick={() => setExpanded(v => !v)} className="flex-1 text-left text-sm font-medium text-gray-800 truncate">
-            {expanded ? '▾' : '▸'} {company.name}
+          <button onClick={() => setExpanded(v => !v)} className="flex-1 flex items-center gap-1.5 text-left text-sm font-medium text-gray-800 min-w-0">
+            <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${statusColor}`} title={statusTitle} />
+            <span className="truncate">{expanded ? '▾' : '▸'} {company.name}</span>
           </button>
         )}
-        <div className="flex gap-1 ml-1">
+        <div className="flex gap-1 ml-1 shrink-0">
+          <button onClick={handleSyncNow} disabled={syncing} title="Sincronizar ahora" className="text-gray-400 hover:text-blue-600 text-xs px-1 disabled:opacity-50">
+            {syncing ? '…' : '↻'}
+          </button>
           <button onClick={() => { setEditingName(true); setNameInput(company.name) }} title="Renombrar" className="text-gray-400 hover:text-gray-600 text-xs px-1">✎</button>
-          <button onClick={() => { if (confirm(`¿Eliminar ${company.name}?`)) removeCompany(companyId) }} title="Eliminar" className="text-gray-400 hover:text-red-500 text-xs px-1">✕</button>
+          <button onClick={() => { if (confirm(`¿Desconectar ${company.name} de QuickBooks?`)) removeCompany(companyId) }} title="Desconectar" className="text-gray-400 hover:text-red-500 text-xs px-1">✕</button>
         </div>
       </div>
 
@@ -115,12 +146,12 @@ export default function Sidebar() {
         </div>
 
         <div className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
-          {/* Companies section — one CompanySection card per uploaded CSV */}
+          {/* Companies section — one CompanySection card per QuickBooks-connected company */}
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Empresas</p>
             <div className="space-y-2">
               {companies.map(c => <CompanySection key={c.id} companyId={c.id} />)}
-              <UploadZone />
+              <CompaniesPanel />
             </div>
           </div>
 
@@ -136,7 +167,7 @@ export default function Sidebar() {
             </div>
             {derivedMetrics.length === 0 ? (
               <p className="text-xs text-gray-400 px-1">
-                {companies.length === 0 ? 'Sube datos primero.' : 'Ninguna creada aún.'}
+                {companies.length === 0 ? 'Conecta una empresa primero.' : 'Ninguna creada aún.'}
               </p>
             ) : (
               <div className="space-y-1">

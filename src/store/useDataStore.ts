@@ -1,8 +1,12 @@
 // Zustand store for company data and metric visibility.
-// Persisted to localStorage under the key 'filippo-data-v1'.
+// `companies` is a Supabase-backed cache populated by loadCompanies() on
+// bootstrap — only `hiddenMetrics` (a pure local UI preference) is persisted
+// to localStorage under the key 'filippo-data-v1'.
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Company, ParsedReport } from '../types'
+import type { Company } from '../types'
+import { supabase } from '../lib/supabaseClient'
+import { disconnectCompany } from '../lib/qboApi'
 
 interface DataState {
   // ─── State ──────────────────────────────────────────────────────────────────
@@ -10,9 +14,11 @@ interface DataState {
   hiddenMetrics: string[]  // "companyId::metricName"
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
-  addCompany: (report: ParsedReport) => Company
-  updateCompanyName: (id: string, name: string) => void
-  removeCompany: (id: string) => void
+  // Wholesale-replaces the companies array — called by loadCompanies() after
+  // fetching from Supabase.
+  setCompanies: (companies: Company[]) => void
+  updateCompanyName: (id: string, name: string) => Promise<void>
+  removeCompany: (id: string) => Promise<void>
   toggleHideMetric: (companyId: string, metricName: string) => void
   isMetricHidden: (companyId: string, metricName: string) => boolean
 
@@ -26,16 +32,14 @@ export const useDataStore = create<DataState>()(
       companies: [],
       hiddenMetrics: [],
 
-      // Assigns a random stable ID and appends the new company.
-      addCompany: (report) => {
-        const id = `co_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-        const company: Company = { id, name: report.companyName, report }
-        set(state => ({ companies: [...state.companies, company] }))
-        return company
-      },
+      setCompanies: (companies) => set({ companies }),
 
-      // Updates both the top-level display name and the name inside the report.
-      updateCompanyName: (id, name) => {
+      // Persists the rename to Supabase (companies.display_name is safe for
+      // the authenticated role to write — see supabase/schema.sql), then
+      // updates local state once that succeeds.
+      updateCompanyName: async (id, name) => {
+        const { error } = await supabase.from('companies').update({ display_name: name }).eq('id', id)
+        if (error) throw new Error(error.message)
         set(state => ({
           companies: state.companies.map(c =>
             c.id === id ? { ...c, name, report: { ...c.report, companyName: name } } : c
@@ -43,8 +47,11 @@ export const useDataStore = create<DataState>()(
         }))
       },
 
-      // Removes the company and cleans up any hidden-metric entries that referenced it.
-      removeCompany: (id) => {
+      // Disconnects the company server-side (service-role — see
+      // api/qbo/disconnect.ts), then removes it locally and cleans up any
+      // hidden-metric entries that referenced it.
+      removeCompany: async (id) => {
+        await disconnectCompany(id)
         set(state => ({
           companies: state.companies.filter(c => c.id !== id),
           hiddenMetrics: state.hiddenMetrics.filter(k => !k.startsWith(`${id}::`)),
@@ -72,6 +79,9 @@ export const useDataStore = create<DataState>()(
         return Array.from(all).sort()
       },
     }),
-    { name: 'filippo-data-v1' }
+    {
+      name: 'filippo-data-v1',
+      partialize: (state) => ({ hiddenMetrics: state.hiddenMetrics }),
+    }
   )
 )

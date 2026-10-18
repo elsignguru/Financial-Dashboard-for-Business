@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.43.4",
     "date-fns": "^4.1.0",
-    "papaparse": "^5.5.3",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "recharts": "^3.8.1",
@@ -20,9 +20,9 @@
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/node": "^24.12.2",
-    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vercel/node": "^3.2.1",
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.5.0",
     "eslint": "^9.39.4",

@@ -25,10 +25,15 @@ export interface ParsedReport {
 }
 
 // A company loaded into the app — wraps its parsed report with a stable ID.
+// qboStatus/lastSyncedAt/lastSyncError mirror the `companies` table and drive
+// the connection-status UI in the sidebar.
 export interface Company {
   id: string
   name: string
   report: ParsedReport
+  qboStatus?: 'connected' | 'error' | 'disconnected'
+  lastSyncedAt?: string | null
+  lastSyncError?: string | null
 }
 
 // ─── Metric references ─────────────────────────────────────────────────────────
