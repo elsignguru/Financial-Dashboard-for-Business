@@ -7,6 +7,7 @@ import { useDataStore } from '../store/useDataStore'
 import type { Company, MetricRow, MetricRowType } from '../types'
 
 interface MetricAccumulator {
+  name: string
   section: string
   type: MetricRowType
   sortOrder: number
@@ -14,17 +15,41 @@ interface MetricAccumulator {
   data: Record<string, number | null>
 }
 
+// Supabase/PostgREST caps every response at 1000 rows regardless of query —
+// a company with full history easily exceeds that, so page through with
+// .range() until a short page comes back (same pattern used in the
+// TempSense dashboard's Supabase reads).
+async function fetchAllLineItems() {
+  const pageSize = 1000
+  const all: NonNullable<Awaited<ReturnType<typeof fetchPage>>['data']> = []
+  let from = 0
+
+  function fetchPage(rangeFrom: number, rangeTo: number) {
+    return supabase.from('pnl_line_items').select('*').order('id', { ascending: true }).range(rangeFrom, rangeTo)
+  }
+
+  while (true) {
+    const { data, error } = await fetchPage(from, from + pageSize - 1)
+    if (error) throw new Error(error.message)
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+
+  return all
+}
+
 export async function loadCompanies(): Promise<void> {
-  const [companiesRes, lineItemsRes] = await Promise.all([
+  const [companiesRes, lineItems] = await Promise.all([
     supabase.from('companies').select('*').order('display_name'),
-    supabase.from('pnl_line_items').select('*'),
+    fetchAllLineItems(),
   ])
 
   if (companiesRes.error) throw new Error(companiesRes.error.message)
-  if (lineItemsRes.error) throw new Error(lineItemsRes.error.message)
 
-  const rowsByCompany = new Map<string, typeof lineItemsRes.data>()
-  for (const row of lineItemsRes.data ?? []) {
+  const rowsByCompany = new Map<string, typeof lineItems>()
+  for (const row of lineItems) {
     const companyId = row.company_id as string
     const list = rowsByCompany.get(companyId) ?? []
     list.push(row)
@@ -33,33 +58,38 @@ export async function loadCompanies(): Promise<void> {
 
   const companies: Company[] = (companiesRes.data ?? []).map(c => {
     const rows = rowsByCompany.get(c.id as string) ?? []
-    const metricsByName = new Map<string, MetricAccumulator>()
+    // Keyed by section+name, not name alone — QuickBooks can have two
+    // identically-named leaf accounts under different sections (e.g.
+    // "Salarios" under both Costo de ventas and Gastos), which would
+    // otherwise silently collapse into one metric here.
+    const metricsByKey = new Map<string, MetricAccumulator>()
 
     for (const row of rows) {
       const name = row.metric_name as string
+      const section = row.section as string
       const syncedAt = row.synced_at as string
+      const key = `${section}::${name}`
 
-      let entry = metricsByName.get(name)
+      let entry = metricsByKey.get(key)
       if (!entry) {
-        entry = { section: row.section as string, type: row.row_type as MetricRowType, sortOrder: row.sort_order as number, syncedAt, data: {} }
-        metricsByName.set(name, entry)
+        entry = { name, section, type: row.row_type as MetricRowType, sortOrder: row.sort_order as number, syncedAt, data: {} }
+        metricsByKey.set(key, entry)
       }
 
       entry.data[row.period as string] = row.value === null ? null : Number(row.value)
 
-      // Metadata (section/type/order) always reflects the most recently
-      // synced row, so the UI self-heals if QBO reorganizes the report.
+      // Metadata (type/order) always reflects the most recently synced row,
+      // so the UI self-heals if QBO reorganizes the report.
       if (syncedAt > entry.syncedAt) {
-        entry.section = row.section as string
         entry.type = row.row_type as MetricRowType
         entry.sortOrder = row.sort_order as number
         entry.syncedAt = syncedAt
       }
     }
 
-    const metrics: MetricRow[] = Array.from(metricsByName.entries())
-      .sort((a, b) => a[1].sortOrder - b[1].sortOrder)
-      .map(([name, m]) => ({ name, section: m.section, type: m.type, data: m.data }))
+    const metrics: MetricRow[] = Array.from(metricsByKey.values())
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(m => ({ name: m.name, section: m.section, type: m.type, data: m.data }))
 
     const dates = Array.from(new Set(rows.map(r => r.period as string))).sort()
 

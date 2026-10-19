@@ -1,7 +1,8 @@
 // POST, authenticated — removes a connected company. Goes through the
-// service-role client (not a client-side delete policy) because the cascade
-// delete into qbo_tokens would otherwise be blocked by that table's RLS,
-// which intentionally has zero policies for the authenticated role.
+// service-role client because `authenticated` is never granted DELETE on
+// `companies` at all (see supabase/schema.sql) — routing deletes through
+// this endpoint keeps "who can disconnect a company" enforced in one place
+// (the requireUser() check below) rather than in an RLS delete policy.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireUser } from '../_lib/auth'
 import { supabaseAdmin } from '../_lib/supabaseAdmin'

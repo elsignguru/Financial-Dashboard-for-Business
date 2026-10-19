@@ -23,6 +23,11 @@ create table if not exists public.companies (
   updated_at       timestamptz not null default now()
 );
 
+-- QuickBooks realm ids are always numeric — rejects a malformed value before
+-- it's ever used to build a request path in qboClient.ts.
+alter table public.companies drop constraint if exists companies_qbo_realm_id_numeric;
+alter table public.companies add constraint companies_qbo_realm_id_numeric check (qbo_realm_id ~ '^[0-9]+$');
+
 alter table public.companies enable row level security;
 
 drop policy if exists "companies read" on public.companies;
@@ -32,10 +37,14 @@ create policy "companies read"
   to authenticated
   using (true);
 
--- Renaming a company (display_name) is safe for `authenticated` to do
--- directly — this table holds no secrets. Deleting a company goes through
--- /api/qbo/disconnect instead (service-role), since the cascade delete into
--- qbo_tokens would otherwise be blocked by that table's RLS.
+-- Renaming a company is safe for `authenticated` to do directly — this
+-- table holds no secrets — but RLS alone only filters which ROWS a
+-- statement can touch, not which COLUMNS it can set. Without the column
+-- grant below, an authenticated client could update ANY column on this
+-- table (qbo_realm_id, status, last_sync_error, ...), not just display_name.
+revoke update on public.companies from authenticated;
+grant update (display_name) on public.companies to authenticated;
+
 drop policy if exists "companies rename" on public.companies;
 create policy "companies rename"
   on public.companies
@@ -43,6 +52,11 @@ create policy "companies rename"
   to authenticated
   using (true)
   with check (true);
+
+-- Deleting a company goes through /api/qbo/disconnect (service-role)
+-- instead of a client-side delete policy: `authenticated` is never granted
+-- DELETE here at all, and that endpoint also makes sure disconnecting one
+-- company can't be triggered by anyone other than a logged-in user.
 
 -- ============================================================================
 -- qbo_tokens — OAuth credentials. RLS enabled with ZERO policies for
@@ -77,11 +91,22 @@ create table if not exists public.pnl_line_items (
   period       text not null,            -- "YYYY-MM"
   value        numeric,                  -- null preserved (matches number|null)
   sort_order   integer not null default 0,
-  synced_at    timestamptz not null default now(),
-  unique (company_id, metric_name, period)
+  synced_at    timestamptz not null default now()
 );
 
 create index if not exists pnl_line_items_company_idx on public.pnl_line_items (company_id);
+
+-- Keyed on (company, SECTION, metric, period) rather than just (company,
+-- metric, period) — QuickBooks can have two identically-named leaf accounts
+-- under different sections (e.g. "Salarios" under both Costo de ventas and
+-- Gastos), which would otherwise collide here and break every sync for that
+-- company with a Postgres upsert conflict error. Explicit drop-then-add
+-- (rather than an inline `unique(...)` on the table) so re-running this
+-- script also migrates a database that already had the narrower constraint.
+alter table public.pnl_line_items drop constraint if exists pnl_line_items_company_id_metric_name_period_key;
+alter table public.pnl_line_items drop constraint if exists pnl_line_items_company_id_section_metric_name_period_key;
+alter table public.pnl_line_items add constraint pnl_line_items_company_id_section_metric_name_period_key
+  unique (company_id, section, metric_name, period);
 
 alter table public.pnl_line_items enable row level security;
 
@@ -93,7 +118,7 @@ create policy "pnl_line_items read"
   using (true);
 
 -- No write policy for authenticated — only service_role writes, via upsert
--- on (company_id, metric_name, period) from the sync job.
+-- on (company_id, section, metric_name, period) from the sync job.
 
 -- Keep companies.updated_at fresh.
 create or replace function public.companies_touch()

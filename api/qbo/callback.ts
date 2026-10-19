@@ -31,25 +31,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  if (!/^\d+$/.test(realmId)) {
+    redirectHome(res, { qbo_error: 'QuickBooks envió un identificador de empresa inválido.' })
+    return
+  }
+
   try {
     const tokens = await exchangeCodeForTokens(code)
-    const companyName = await fetchCompanyName(realmId, tokens.access_token)
-
     const admin = supabaseAdmin()
-    const { data: company, error: upsertErr } = await admin
-      .from('companies')
-      .upsert(
-        { qbo_realm_id: realmId, display_name: companyName, status: 'connected', last_sync_error: null },
-        { onConflict: 'qbo_realm_id' },
-      )
-      .select('id')
-      .single()
 
-    if (upsertErr || !company) throw new Error(upsertErr?.message || 'No se pudo guardar la empresa')
+    // Look up by realm id first rather than a blind upsert, so reconnecting
+    // an already-known company never clobbers a display_name you've
+    // customized — the QuickBooks name is only used for brand-new companies.
+    const { data: existing, error: lookupErr } = await admin
+      .from('companies').select('id').eq('qbo_realm_id', realmId).maybeSingle()
+    if (lookupErr) throw new Error(lookupErr.message)
 
-    await storeTokens(company.id as string, tokens)
+    let companyId: string
+    if (existing) {
+      companyId = existing.id as string
+      const { error: updateErr } = await admin
+        .from('companies')
+        .update({ status: 'connected', last_sync_error: null })
+        .eq('id', companyId)
+      if (updateErr) throw new Error(updateErr.message)
+    } else {
+      const companyName = await fetchCompanyName(realmId, tokens.access_token)
+      const { data: inserted, error: insertErr } = await admin
+        .from('companies')
+        .insert({ qbo_realm_id: realmId, display_name: companyName })
+        .select('id')
+        .single()
+      if (insertErr || !inserted) throw new Error(insertErr?.message || 'No se pudo guardar la empresa')
+      companyId = inserted.id as string
+    }
 
-    redirectHome(res, { connected: company.id as string })
+    await storeTokens(companyId, tokens)
+
+    redirectHome(res, { connected: companyId })
   } catch (err) {
     redirectHome(res, { qbo_error: err instanceof Error ? err.message : String(err) })
   }

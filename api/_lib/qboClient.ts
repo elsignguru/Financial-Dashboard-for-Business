@@ -186,7 +186,7 @@ export async function syncCompany(companyId: string, opts: { fullHistory?: boole
           sort_order: r.sortOrder,
           synced_at: new Date().toISOString(),
         })),
-        { onConflict: 'company_id,metric_name,period' },
+        { onConflict: 'company_id,section,metric_name,period' },
       )
       if (upsertErr) throw new Error(`No se pudo guardar el P&L: ${upsertErr.message}`)
     }
