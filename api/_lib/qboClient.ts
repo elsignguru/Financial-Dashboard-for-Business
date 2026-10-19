@@ -1,6 +1,15 @@
 // QuickBooks Online OAuth2 + Reports API client, plus the single shared
 // per-company sync implementation used by both the cron job (sync.ts) and
 // the on-demand endpoint (sync-now.ts).
+//
+// READ-ONLY BY DESIGN: Intuit does not offer a read-only OAuth scope for the
+// Accounting API — the `com.intuit.quickbooks.accounting` scope we request
+// is the same one write-capable apps use. The read-only guarantee here is
+// enforced entirely by this file: `qboGet()` below is the ONLY function that
+// talks to the Accounting API (`/v3/company/...`), and it is hardcoded to
+// GET. Do not add a POST/PUT/DELETE call to that API anywhere in this
+// codebase without explicit sign-off — this app must never be able to
+// create, update, or delete anything in a connected QuickBooks company.
 import { supabaseAdmin } from './supabaseAdmin'
 import { transformProfitAndLoss } from './qboTransform'
 
@@ -74,9 +83,13 @@ export function refreshTokens(refreshToken: string): Promise<TokenResponse> {
   }))
 }
 
+// The only function in this codebase that calls the QBO Accounting API.
+// `method: 'GET'` is explicit (not relying on fetch's default) — see the
+// read-only note at the top of this file before ever changing it.
 async function qboGet(realmId: string, accessToken: string, path: string): Promise<unknown> {
   const url = `${apiBase()}/v3/company/${realmId}/${path}${path.includes('?') ? '&' : '?'}minorversion=65`
   const res = await fetch(url, {
+    method: 'GET',
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
   })
   if (!res.ok) {
