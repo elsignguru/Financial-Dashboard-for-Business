@@ -113,5 +113,16 @@ export function transformProfitAndLoss(report: QboReport): PnlRow[] {
 
   const out: PnlRow[] = []
   walk(rows, periods, '', out, { n: 0 })
-  return out
+
+  // A single upsert() call can't touch the same conflict key twice in one
+  // statement (Postgres: "ON CONFLICT DO UPDATE command cannot affect row a
+  // second time") — so even though the DB's unique key already accounts for
+  // duplicate account names across sections, we still have to guarantee no
+  // two rows in this one batch share a key, regardless of why QBO's report
+  // produced them. Last one wins, matching normal upsert semantics.
+  const dedup = new Map<string, PnlRow>()
+  for (const row of out) {
+    dedup.set(`${row.section}::${row.metricName}::${row.period}`, row)
+  }
+  return Array.from(dedup.values())
 }
