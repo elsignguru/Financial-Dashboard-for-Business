@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { syncCompany } from '../_lib/qboClient.js'
+import { noStore } from '../_lib/http.js'
 
 export const config = { maxDuration: 300 }
 
@@ -18,6 +19,7 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  noStore(res)
   const cronSecret = process.env.CRON_SECRET
   if (!cronSecret || !safeEqual(req.headers.authorization ?? '', `Bearer ${cronSecret}`)) {
     res.status(401).json({ error: 'Unauthorized' })

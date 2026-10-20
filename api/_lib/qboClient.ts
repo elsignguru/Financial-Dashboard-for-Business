@@ -12,6 +12,7 @@
 // create, update, or delete anything in a connected QuickBooks company.
 import { supabaseAdmin } from './supabaseAdmin.js'
 import { transformProfitAndLoss } from './qboTransform.js'
+import { encryptSecret, decryptSecret } from './crypto.js'
 
 const TOKEN_ENDPOINT = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer'
 const AUTHORIZE_ENDPOINT = 'https://appcenter.intuit.com/connect/oauth2'
@@ -114,15 +115,17 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-// Persists newly-issued tokens. QBO ROTATES the refresh token on every use —
-// failing to store the new one here invalidates the connection within one cycle.
+// Persists newly-issued tokens, encrypted at rest (AES-256-GCM, key held
+// only in Vercel — see _lib/crypto.ts) per Intuit's security policy. QBO
+// ROTATES the refresh token on every use — failing to store the new one
+// here invalidates the connection within one cycle.
 export async function storeTokens(companyId: string, tokens: TokenResponse) {
   const now = Date.now()
   const { error } = await supabaseAdmin().from('qbo_tokens').upsert({
     company_id: companyId,
-    access_token: tokens.access_token,
+    access_token: encryptSecret(tokens.access_token),
     access_token_expires_at: new Date(now + tokens.expires_in * 1000).toISOString(),
-    refresh_token: tokens.refresh_token,
+    refresh_token: encryptSecret(tokens.refresh_token),
     refresh_token_expires_at: new Date(now + tokens.x_refresh_token_expires_in * 1000).toISOString(),
     updated_at: new Date(now).toISOString(),
   })
@@ -145,10 +148,10 @@ async function getValidAccessToken(companyId: string): Promise<{ accessToken: st
   const expiresAt = new Date(tokenRow.access_token_expires_at as string).getTime()
   const safetyMarginMs = 5 * 60 * 1000
   if (Date.now() < expiresAt - safetyMarginMs) {
-    return { accessToken: tokenRow.access_token as string, realmId: company.qbo_realm_id as string }
+    return { accessToken: decryptSecret(tokenRow.access_token as string), realmId: company.qbo_realm_id as string }
   }
 
-  const refreshed = await refreshTokens(tokenRow.refresh_token as string)
+  const refreshed = await refreshTokens(decryptSecret(tokenRow.refresh_token as string))
   await storeTokens(companyId, refreshed)
   return { accessToken: refreshed.access_token, realmId: company.qbo_realm_id as string }
 }

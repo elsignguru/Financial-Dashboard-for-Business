@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js'
 import { exchangeCodeForTokens, fetchCompanyName, storeTokens } from '../_lib/qboClient.js'
 import { verifyState } from '../_lib/state.js'
+import { noStore } from '../_lib/http.js'
 
 function redirectHome(res: VercelResponse, params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString()
@@ -14,6 +15,7 @@ function redirectHome(res: VercelResponse, params: Record<string, string>) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  noStore(res)
   const { code, realmId, state, error: qboError } = req.query as Record<string, string | undefined>
 
   if (qboError) {

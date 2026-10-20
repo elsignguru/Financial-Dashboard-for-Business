@@ -6,8 +6,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireUser } from '../_lib/auth.js'
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js'
+import { noStore } from '../_lib/http.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  noStore(res)
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
     return
