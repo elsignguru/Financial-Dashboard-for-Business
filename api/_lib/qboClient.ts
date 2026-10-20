@@ -53,6 +53,14 @@ export function buildAuthorizationUrl(state: string): string {
   return `${AUTHORIZE_ENDPOINT}?${params.toString()}`
 }
 
+// Intuit support can look up exactly what happened on their end for a
+// specific failed call if given this id — captured on every failure so it
+// ends up in companies.last_sync_error, visible right in the dashboard.
+function describeFailure(res: Response, body: string): string {
+  const tid = res.headers.get('intuit_tid')
+  return `(${res.status})${tid ? ` [intuit_tid: ${tid}]` : ''}: ${body}`
+}
+
 async function requestToken(body: URLSearchParams): Promise<TokenResponse> {
   const res = await fetch(TOKEN_ENDPOINT, {
     method: 'POST',
@@ -64,7 +72,7 @@ async function requestToken(body: URLSearchParams): Promise<TokenResponse> {
     body,
   })
   if (!res.ok) {
-    throw new Error(`QuickBooks token request failed (${res.status}): ${await res.text()}`)
+    throw new Error(`QuickBooks token request failed ${describeFailure(res, await res.text())}`)
   }
   return res.json() as Promise<TokenResponse>
 }
@@ -98,7 +106,7 @@ export async function revokeToken(token: string): Promise<void> {
     body: JSON.stringify({ token }),
   })
   if (!res.ok) {
-    throw new Error(`QuickBooks revoke request failed (${res.status}): ${await res.text()}`)
+    throw new Error(`QuickBooks revoke request failed ${describeFailure(res, await res.text())}`)
   }
 }
 
@@ -112,7 +120,7 @@ async function qboGet(realmId: string, accessToken: string, path: string): Promi
     headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
   })
   if (!res.ok) {
-    throw new Error(`QuickBooks API request failed (${res.status}) for ${path}: ${await res.text()}`)
+    throw new Error(`QuickBooks API request failed ${describeFailure(res, await res.text())} for ${path}`)
   }
   return res.json()
 }

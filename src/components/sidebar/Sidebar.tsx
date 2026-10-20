@@ -189,6 +189,13 @@ export default function Sidebar() {
             )}
           </div>
         </div>
+
+        {/* Footer — legal links, required by Intuit's production-keys review */}
+        <div className="px-4 py-2 border-t border-gray-100 text-center text-xs text-gray-400 space-x-2 shrink-0">
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 hover:underline">Privacidad</a>
+          <span>·</span>
+          <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 hover:underline">Términos</a>
+        </div>
       </aside>
 
       <DerivedMetricModal open={addingDerived} onClose={() => setAddingDerived(false)} />
