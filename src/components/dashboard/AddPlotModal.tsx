@@ -70,6 +70,10 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
   const [chartType, setChartType] = useState<ChartType>(editing?.chartType ?? 'line')
   const [periodStart, setPeriodStart] = useState(editing?.periodStart ?? defaultStart)
   const [periodEnd, setPeriodEnd] = useState(editing?.periodEnd ?? defaultEnd)
+  // Y-axis range inputs — kept as strings so the field can be legitimately
+  // empty (= Auto) while typing, converted to numbers only on submit.
+  const [yAxisMin, setYAxisMin] = useState(editing?.yAxisMin != null ? String(editing.yAxisMin) : '')
+  const [yAxisMax, setYAxisMax] = useState(editing?.yAxisMax != null ? String(editing.yAxisMax) : '')
   const [seriesList, setSeriesList] = useState<SeriesForm[]>(
     editing ? editing.series.map(s => seriesFromConfig(s, companies)) : [newSeries(activeCompanies[0]?.id ?? '')]
   )
@@ -99,6 +103,13 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
     if (periodStart > periodEnd) { setError('La fecha inicio debe ser anterior al fin'); return }
     if (!seriesList.length) { setError('Agrega al menos una serie'); return }
 
+    const yMin = yAxisMin === '' ? null : Number(yAxisMin)
+    const yMax = yAxisMax === '' ? null : Number(yAxisMax)
+    if (yMin != null && yMax != null && yMin >= yMax) {
+      setError('El mínimo del eje Y debe ser menor que el máximo')
+      return
+    }
+
     const series: PlotSeries[] = []
     for (const s of seriesList) {
       const ref = seriesFormToRef(s)
@@ -107,9 +118,9 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
     }
 
     if (editing) {
-      updatePlot(editing.id, { title: title || autoTitle(seriesList), chartType, periodStart, periodEnd, series })
+      updatePlot(editing.id, { title: title || autoTitle(seriesList), chartType, periodStart, periodEnd, series, yAxisMin: yMin, yAxisMax: yMax })
     } else {
-      addPlot({ title: title || autoTitle(seriesList), chartType, periodStart, periodEnd, series })
+      addPlot({ title: title || autoTitle(seriesList), chartType, periodStart, periodEnd, series, yAxisMin: yMin, yAxisMax: yMax })
     }
     onClose()
   }
@@ -205,6 +216,39 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
             />
           </div>
         </div>
+
+        {/* Y-axis range — Auto (default) or a manual min/max */}
+        {chartType !== 'pie' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Rango del eje Y</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="number"
+                value={yAxisMin}
+                onChange={e => setYAxisMin(e.target.value)}
+                placeholder="Auto"
+                className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-gray-400 text-sm">→</span>
+              <input
+                type="number"
+                value={yAxisMax}
+                onChange={e => setYAxisMax(e.target.value)}
+                placeholder="Auto"
+                className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {(yAxisMin !== '' || yAxisMax !== '') && (
+                <button
+                  type="button"
+                  onClick={() => { setYAxisMin(''); setYAxisMax('') }}
+                  className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                >
+                  Restablecer
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Series list — each series is its own collapsible card */}
         <div>

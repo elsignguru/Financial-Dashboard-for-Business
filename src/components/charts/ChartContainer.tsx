@@ -10,6 +10,7 @@ import { useMetricStore } from '../../store/useMetricStore'
 import { resolveMetric } from '../../utils/resolveMetric'
 import { getColor } from '../../utils/colors'
 import { formatDate, formatValue, formatValueShort } from '../../utils/dateUtils'
+import { computeYAxisScale } from '../../utils/niceTicks'
 
 interface SeriesData {
   label: string
@@ -48,6 +49,27 @@ function mergeForRecharts(seriesData: SeriesData[]) {
     })
     return row
   })
+}
+
+// Scans every series' value in the merged rows to find the overall min/max,
+// so the Y-axis scale always covers everything plotted (Recharts' own
+// `dataMin`/`dataMax` domain keywords only look at ONE dataKey at a time,
+// not all of them together).
+function dataRange(chartData: Record<string, string | number | null>[], seriesCount: number): [number, number] {
+  let min = Infinity
+  let max = -Infinity
+  for (const row of chartData) {
+    for (let i = 0; i < seriesCount; i++) {
+      const v = row[`s${i}`]
+      if (typeof v === 'number') {
+        if (v < min) min = v
+        if (v > max) max = v
+      }
+    }
+  }
+  if (min === Infinity) return [0, 1] // no numeric data at all
+  if (min > 0) min = 0 // always include the zero baseline unless data goes negative
+  return [min, max]
 }
 
 // ─── Custom tooltip ─────────────────────────────────────────────────────────────
@@ -98,6 +120,12 @@ export default function ChartContainer({ plot }: { plot: PlotConfig }) {
     )
   }
 
+  // Uniform, clean Y-axis gridlines (round numbers, evenly spaced) rather
+  // than Recharts' default auto-ticks — honors plot.yAxisMin/Max when set,
+  // otherwise computed from the data.
+  const [dataMin, dataMax] = dataRange(chartData, seriesData.length)
+  const yScale = computeYAxisScale(dataMin, dataMax, plot.yAxisMin, plot.yAxisMax)
+
   // Bar chart: stacked by default, one bar per month.
   if (plot.chartType === 'bar') {
     return (
@@ -105,7 +133,7 @@ export default function ChartContainer({ plot }: { plot: PlotConfig }) {
         <BarChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
           <XAxis dataKey="dateLabel" tick={{ fontSize: 11 }} />
-          <YAxis tickFormatter={formatValueShort} tick={{ fontSize: 11 }} width={56} />
+          <YAxis domain={yScale.domain} ticks={yScale.ticks} tickFormatter={formatValueShort} tick={{ fontSize: 11 }} width={56} />
           <Tooltip content={<CustomTooltip />} />
           {seriesData.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
           {seriesData.map((s, i) => (
@@ -122,7 +150,7 @@ export default function ChartContainer({ plot }: { plot: PlotConfig }) {
       <LineChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
         <XAxis dataKey="dateLabel" tick={{ fontSize: 11 }} />
-        <YAxis tickFormatter={formatValueShort} tick={{ fontSize: 11 }} width={56} />
+        <YAxis domain={yScale.domain} ticks={yScale.ticks} tickFormatter={formatValueShort} tick={{ fontSize: 11 }} width={56} />
         <Tooltip content={<CustomTooltip />} />
         {seriesData.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
         {seriesData.map((s, i) => (

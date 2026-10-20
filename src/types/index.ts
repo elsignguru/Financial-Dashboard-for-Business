@@ -57,6 +57,8 @@ export interface PlotSeries {
 }
 
 // Full configuration for a chart card on the dashboard grid.
+// yAxisMin/yAxisMax are optional manual Y-axis bounds (line/bar charts
+// only) — null/undefined means auto-scaled from the data.
 export interface PlotConfig {
   id: string
   title: string
@@ -64,6 +66,8 @@ export interface PlotConfig {
   series: PlotSeries[]
   periodStart: string
   periodEnd: string
+  yAxisMin?: number | null
+  yAxisMax?: number | null
 }
 
 // ─── Derived metrics ───────────────────────────────────────────────────────────
