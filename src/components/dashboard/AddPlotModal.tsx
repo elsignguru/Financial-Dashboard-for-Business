@@ -259,25 +259,33 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
                   ))}
                 </div>
 
-                {/* Raw mode: pick a single company + metric */}
-                {s.mode === 'raw' && companies.length > 0 && (
-                  <MetricSelector
-                    companies={companies}
-                    selectedCompanyId={s.companyId || companies[0].id}
-                    selectedMetricName={s.metricName}
-                    onCompanyChange={id => updateSeries(s.tempId, { companyId: id, metricName: '', label: '' })}
-                    onMetricChange={name => {
-                      // Always regenerate the label from the current company+metric so the legend
-                      // never drifts from the underlying ref. If the user wants a custom label,
-                      // they can type it in the label input afterwards (that edit happens last).
-                      const co = companies.find(c => c.id === (s.companyId || companies[0].id))
-                      updateSeries(s.tempId, {
-                        metricName: name,
-                        label: name && co ? `${name} — ${co.name}` : '',
-                      })
-                    }}
-                  />
-                )}
+                {/* Raw mode: pick a single company + metric. Falls back to the first
+                    loaded company whenever s.companyId is empty OR stale (e.g. it
+                    pointed at a company that's since been disconnected/reconnected
+                    and so no longer exists) — and, critically, writes that resolved
+                    id back into form state on the next change, not just display. */}
+                {s.mode === 'raw' && companies.length > 0 && (() => {
+                  const resolvedCompanyId = companies.some(c => c.id === s.companyId) ? s.companyId : companies[0].id
+                  return (
+                    <MetricSelector
+                      companies={companies}
+                      selectedCompanyId={resolvedCompanyId}
+                      selectedMetricName={s.metricName}
+                      onCompanyChange={id => updateSeries(s.tempId, { companyId: id, metricName: '', label: '' })}
+                      onMetricChange={name => {
+                        // Always regenerate the label from the current company+metric so the legend
+                        // never drifts from the underlying ref. If the user wants a custom label,
+                        // they can type it in the label input afterwards (that edit happens last).
+                        const co = companies.find(c => c.id === resolvedCompanyId)
+                        updateSeries(s.tempId, {
+                          companyId: resolvedCompanyId,
+                          metricName: name,
+                          label: name && co ? `${name} — ${co.name}` : '',
+                        })
+                      }}
+                    />
+                  )
+                })()}
 
                 {/* Combined mode: checkboxes to select which companies to sum, then pick the metric */}
                 {s.mode === 'combined' && (

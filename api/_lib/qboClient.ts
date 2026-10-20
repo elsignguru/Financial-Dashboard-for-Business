@@ -84,6 +84,24 @@ export function refreshTokens(refreshToken: string): Promise<TokenResponse> {
   }))
 }
 
+// Tells Intuit the connection is over, so the grant doesn't stay live on
+// their end after we've already deleted our copy of the tokens. Best-effort:
+// callers should not fail the whole disconnect if this throws.
+export async function revokeToken(token: string): Promise<void> {
+  const res = await fetch('https://developer.api.intuit.com/v2/oauth2/tokens/revoke', {
+    method: 'POST',
+    headers: {
+      Authorization: basicAuthHeader(),
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token }),
+  })
+  if (!res.ok) {
+    throw new Error(`QuickBooks revoke request failed (${res.status}): ${await res.text()}`)
+  }
+}
+
 // The only function in this codebase that calls the QBO Accounting API.
 // `method: 'GET'` is explicit (not relying on fetch's default) — see the
 // read-only note at the top of this file before ever changing it.

@@ -48,13 +48,14 @@ export const useDataStore = create<DataState>()(
       },
 
       // Disconnects the company server-side (service-role — see
-      // api/qbo/disconnect.ts), then removes it locally and cleans up any
-      // hidden-metric entries that referenced it.
+      // api/qbo/disconnect.ts, a SOFT disconnect: same id, history kept,
+      // only the QuickBooks token is removed). Reflect that locally by
+      // marking it disconnected rather than removing it from the list —
+      // reconnecting reuses the same id, so charts referencing it keep working.
       removeCompany: async (id) => {
         await disconnectCompany(id)
         set(state => ({
-          companies: state.companies.filter(c => c.id !== id),
-          hiddenMetrics: state.hiddenMetrics.filter(k => !k.startsWith(`${id}::`)),
+          companies: state.companies.map(c => c.id === id ? { ...c, qboStatus: 'disconnected' } : c),
         }))
       },
 
