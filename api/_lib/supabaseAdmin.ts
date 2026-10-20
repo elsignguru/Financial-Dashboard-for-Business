@@ -2,7 +2,7 @@
 // must never be imported from anything that ships to the browser; it only
 // ever runs inside api/**.
 import { createClient } from '@supabase/supabase-js'
-import type { Database } from './database.types'
+import type { Database } from './database.types.js'
 
 let client: ReturnType<typeof createClient<Database>> | null = null
 

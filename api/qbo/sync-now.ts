@@ -4,8 +4,8 @@
 // historical backfill — kept out of callback.ts to avoid any timeout risk
 // during the OAuth redirect chain).
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { requireUser } from '../_lib/auth'
-import { syncCompany } from '../_lib/qboClient'
+import { requireUser } from '../_lib/auth.js'
+import { syncCompany } from '../_lib/qboClient.js'
 
 export const config = { maxDuration: 60 }
 

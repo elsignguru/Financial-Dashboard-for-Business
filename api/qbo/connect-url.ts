@@ -3,9 +3,9 @@
 // string) so it never lands in server logs or browser history; the browser
 // then navigates directly to the returned Intuit URL.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { requireUser } from '../_lib/auth'
-import { buildAuthorizationUrl } from '../_lib/qboClient'
-import { signState } from '../_lib/state'
+import { requireUser } from '../_lib/auth.js'
+import { buildAuthorizationUrl } from '../_lib/qboClient.js'
+import { signState } from '../_lib/state.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

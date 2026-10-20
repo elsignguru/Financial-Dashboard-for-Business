@@ -3,9 +3,9 @@
 // exchanges the code, upserts the company + tokens, and redirects back.
 // Kept fast so it never risks a serverless timeout during the OAuth chain.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { supabaseAdmin } from '../_lib/supabaseAdmin'
-import { exchangeCodeForTokens, fetchCompanyName, storeTokens } from '../_lib/qboClient'
-import { verifyState } from '../_lib/state'
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js'
+import { exchangeCodeForTokens, fetchCompanyName, storeTokens } from '../_lib/qboClient.js'
+import { verifyState } from '../_lib/state.js'
 
 function redirectHome(res: VercelResponse, params: Record<string, string>) {
   const qs = new URLSearchParams(params).toString()

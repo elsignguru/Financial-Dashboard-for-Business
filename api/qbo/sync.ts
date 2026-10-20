@@ -4,8 +4,8 @@
 // blocks the rest; syncCompany() itself records the error on that company row.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createHash, timingSafeEqual } from 'node:crypto'
-import { supabaseAdmin } from '../_lib/supabaseAdmin'
-import { syncCompany } from '../_lib/qboClient'
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js'
+import { syncCompany } from '../_lib/qboClient.js'
 
 export const config = { maxDuration: 300 }
 

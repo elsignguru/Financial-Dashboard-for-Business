@@ -10,8 +10,8 @@
 // GET. Do not add a POST/PUT/DELETE call to that API anywhere in this
 // codebase without explicit sign-off — this app must never be able to
 // create, update, or delete anything in a connected QuickBooks company.
-import { supabaseAdmin } from './supabaseAdmin'
-import { transformProfitAndLoss } from './qboTransform'
+import { supabaseAdmin } from './supabaseAdmin.js'
+import { transformProfitAndLoss } from './qboTransform.js'
 
 const TOKEN_ENDPOINT = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer'
 const AUTHORIZE_ENDPOINT = 'https://appcenter.intuit.com/connect/oauth2'
