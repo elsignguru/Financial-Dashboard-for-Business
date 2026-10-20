@@ -29,6 +29,9 @@ export function syncCompanyNow(companyId: string, fullHistory = false): Promise<
   return authedFetch('/api/qbo/sync-now', { companyId, fullHistory })
 }
 
-export function disconnectCompany(companyId: string): Promise<unknown> {
-  return authedFetch('/api/qbo/disconnect', { companyId })
+// `permanent: true` fully deletes the company and its synced history
+// instead of the default soft-disconnect (keeps the row so reconnecting
+// doesn't orphan existing charts).
+export function disconnectCompany(companyId: string, permanent = false): Promise<unknown> {
+  return authedFetch('/api/qbo/disconnect', { companyId, permanent })
 }

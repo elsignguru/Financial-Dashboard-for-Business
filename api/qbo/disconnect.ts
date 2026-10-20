@@ -1,9 +1,12 @@
-// POST, authenticated — disconnects a company. This is a SOFT disconnect:
-// the companies row (and its id, and its synced pnl_line_items history) is
-// kept — only qbo_tokens is removed and status flips to 'disconnected'.
-// Keeping the same id means any chart/derived-metric referencing this
-// company keeps working once it's reconnected, instead of silently going
-// blank because a hard delete + re-insert would have given it a new id.
+// POST, authenticated — disconnects a company. By default this is a SOFT
+// disconnect: the companies row (and its id, and its synced pnl_line_items
+// history) is kept — only qbo_tokens is removed and status flips to
+// 'disconnected'. Keeping the same id means any chart/derived-metric
+// referencing this company keeps working once it's reconnected, instead of
+// silently going blank because a hard delete + re-insert would have given
+// it a new id. Pass `permanent: true` to fully remove the company and its
+// history instead — for a company (e.g. a Sandbox test one) that will
+// never be reconnected and whose data you want gone, not just paused.
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireUser } from '../_lib/auth.js'
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js'
@@ -25,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const { companyId } = req.body as { companyId?: string }
+  const { companyId, permanent } = req.body as { companyId?: string; permanent?: boolean }
   if (!companyId) {
     res.status(400).json({ error: 'Falta companyId' })
     return
@@ -48,6 +51,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { error: tokenDeleteErr } = await admin.from('qbo_tokens').delete().eq('company_id', companyId)
   if (tokenDeleteErr) {
     res.status(500).json({ error: tokenDeleteErr.message })
+    return
+  }
+
+  if (permanent) {
+    // Cascades to pnl_line_items via the FK — fully removes the company and
+    // all its synced history, not just the live connection.
+    const { error: deleteErr } = await admin.from('companies').delete().eq('id', companyId)
+    if (deleteErr) {
+      res.status(500).json({ error: deleteErr.message })
+      return
+    }
+    res.status(200).json({ ok: true, permanent: true })
     return
   }
 

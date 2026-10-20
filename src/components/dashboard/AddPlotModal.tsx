@@ -47,6 +47,12 @@ interface Props {
 
 export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
   const companies = useDataStore(s => s.companies)
+  // Disconnected companies (e.g. a Sandbox test one, or a real one you've
+  // paused) are kept in `companies` so existing charts referencing them
+  // keep resolving — but they shouldn't be offered as a choice when
+  // building a NEW or additional series, so every picker below uses this
+  // filtered list instead of the raw one.
+  const activeCompanies = companies.filter(c => c.qboStatus !== 'disconnected')
   const allDates = useDataStore(s => s.allDates)
   const derivedMetrics = useMetricStore(s => s.derivedMetrics)
   const addPlot = useLayoutStore(s => s.addPlot)
@@ -65,7 +71,7 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
   const [periodStart, setPeriodStart] = useState(editing?.periodStart ?? defaultStart)
   const [periodEnd, setPeriodEnd] = useState(editing?.periodEnd ?? defaultEnd)
   const [seriesList, setSeriesList] = useState<SeriesForm[]>(
-    editing ? editing.series.map(s => seriesFromConfig(s, companies)) : [newSeries(companies[0]?.id ?? '')]
+    editing ? editing.series.map(s => seriesFromConfig(s, companies)) : [newSeries(activeCompanies[0]?.id ?? '')]
   )
   const [error, setError] = useState('')
 
@@ -206,9 +212,9 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
             <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Series de datos</label>
             <button
               onClick={() => {
-                // Cycle through available companies so each new series defaults to a different company.
-                const nextIdx = seriesList.length % companies.length
-                setSeriesList(prev => [...prev, newSeries(companies[nextIdx]?.id ?? companies[0]?.id ?? '')])
+                // Cycle through active companies so each new series defaults to a different one.
+                const nextIdx = activeCompanies.length ? seriesList.length % activeCompanies.length : 0
+                setSeriesList(prev => [...prev, newSeries(activeCompanies[nextIdx]?.id ?? '')])
               }}
               className="text-xs text-blue-600 hover:text-blue-800 font-medium"
             >
@@ -259,16 +265,18 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
                   ))}
                 </div>
 
-                {/* Raw mode: pick a single company + metric. Falls back to the first
-                    loaded company whenever s.companyId is empty OR stale (e.g. it
-                    pointed at a company that's since been disconnected/reconnected
-                    and so no longer exists) — and, critically, writes that resolved
-                    id back into form state on the next change, not just display. */}
-                {s.mode === 'raw' && companies.length > 0 && (() => {
-                  const resolvedCompanyId = companies.some(c => c.id === s.companyId) ? s.companyId : companies[0].id
+                {/* Raw mode: pick a single company + metric. Only offers active
+                    (connected/error, not disconnected) companies as choices, and
+                    falls back to the first one whenever s.companyId is empty OR
+                    stale (e.g. it pointed at a company that's since been
+                    disconnected/reconnected and so no longer exists) — and,
+                    critically, writes that resolved id back into form state on
+                    the next change, not just display. */}
+                {s.mode === 'raw' && activeCompanies.length > 0 && (() => {
+                  const resolvedCompanyId = activeCompanies.some(c => c.id === s.companyId) ? s.companyId : activeCompanies[0].id
                   return (
                     <MetricSelector
-                      companies={companies}
+                      companies={activeCompanies}
                       selectedCompanyId={resolvedCompanyId}
                       selectedMetricName={s.metricName}
                       onCompanyChange={id => updateSeries(s.tempId, { companyId: id, metricName: '', label: '' })}
@@ -276,7 +284,7 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
                         // Always regenerate the label from the current company+metric so the legend
                         // never drifts from the underlying ref. If the user wants a custom label,
                         // they can type it in the label input afterwards (that edit happens last).
-                        const co = companies.find(c => c.id === resolvedCompanyId)
+                        const co = activeCompanies.find(c => c.id === resolvedCompanyId)
                         updateSeries(s.tempId, {
                           companyId: resolvedCompanyId,
                           metricName: name,
@@ -292,7 +300,7 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
                   <div className="space-y-2">
                     <label className="block text-xs text-gray-500">Empresas a sumar:</label>
                     <div className="flex flex-wrap gap-2">
-                      {companies.map(c => (
+                      {activeCompanies.map(c => (
                         <label key={c.id} className="flex items-center gap-1 text-sm cursor-pointer">
                           <input
                             type="checkbox"

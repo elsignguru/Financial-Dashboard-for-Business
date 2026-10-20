@@ -84,7 +84,23 @@ function CompanySection({ companyId }: { companyId: string }) {
             {syncing ? '…' : '↻'}
           </button>
           <button onClick={() => { setEditingName(true); setNameInput(company.name) }} title="Renombrar" className="text-gray-400 hover:text-gray-600 text-xs px-1">✎</button>
-          <button onClick={() => { if (confirm(`¿Desconectar ${company.name} de QuickBooks?`)) removeCompany(companyId) }} title="Desconectar" className="text-gray-400 hover:text-red-500 text-xs px-1">✕</button>
+          {company.qboStatus === 'disconnected' ? (
+            <button
+              onClick={() => { if (confirm(`¿Eliminar permanentemente ${company.name} y todo su historial? Esta acción no se puede deshacer.`)) removeCompany(companyId, true) }}
+              title="Eliminar permanentemente"
+              className="text-gray-400 hover:text-red-500 text-xs px-1"
+            >
+              🗑
+            </button>
+          ) : (
+            <button
+              onClick={() => { if (confirm(`¿Desconectar ${company.name} de QuickBooks?`)) removeCompany(companyId) }}
+              title="Desconectar"
+              className="text-gray-400 hover:text-red-500 text-xs px-1"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 

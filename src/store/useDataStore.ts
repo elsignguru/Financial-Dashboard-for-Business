@@ -18,7 +18,7 @@ interface DataState {
   // fetching from Supabase.
   setCompanies: (companies: Company[]) => void
   updateCompanyName: (id: string, name: string) => Promise<void>
-  removeCompany: (id: string) => Promise<void>
+  removeCompany: (id: string, permanent?: boolean) => Promise<void>
   toggleHideMetric: (companyId: string, metricName: string) => void
   isMetricHidden: (companyId: string, metricName: string) => boolean
 
@@ -48,14 +48,21 @@ export const useDataStore = create<DataState>()(
       },
 
       // Disconnects the company server-side (service-role — see
-      // api/qbo/disconnect.ts, a SOFT disconnect: same id, history kept,
-      // only the QuickBooks token is removed). Reflect that locally by
-      // marking it disconnected rather than removing it from the list —
-      // reconnecting reuses the same id, so charts referencing it keep working.
-      removeCompany: async (id) => {
-        await disconnectCompany(id)
+      // api/qbo/disconnect.ts). Default is a SOFT disconnect: same id,
+      // history kept, only the QuickBooks token is removed — reflected
+      // locally by marking it disconnected rather than removing it from the
+      // list, since reconnecting reuses the same id and charts referencing
+      // it keep working. `permanent: true` fully deletes it instead (e.g.
+      // a Sandbox test company you'll never reconnect) — removed locally too.
+      removeCompany: async (id, permanent = false) => {
+        await disconnectCompany(id, permanent)
         set(state => ({
-          companies: state.companies.map(c => c.id === id ? { ...c, qboStatus: 'disconnected' } : c),
+          companies: permanent
+            ? state.companies.filter(c => c.id !== id)
+            : state.companies.map(c => c.id === id ? { ...c, qboStatus: 'disconnected' } : c),
+          hiddenMetrics: permanent
+            ? state.hiddenMetrics.filter(k => !k.startsWith(`${id}::`))
+            : state.hiddenMetrics,
         }))
       },
 
