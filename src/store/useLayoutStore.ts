@@ -1,7 +1,9 @@
-// Zustand store for dashboard layout — which chart cards exist and how they're configured.
-// Persisted to localStorage under the key 'filippo-layout-v1'.
+// Zustand store for dashboard layout — which chart cards exist and how
+// they're configured. Shared globally: synced to/from the singleton
+// `dashboard_config` row in Supabase (see src/data/dashboardConfigSync.ts)
+// rather than localStorage, so every invited user sees the same charts
+// regardless of device or session — same pattern as the TempSense dashboard.
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import type { PlotConfig, PlotSeries } from '../types'
 
 interface LayoutState {
@@ -9,6 +11,7 @@ interface LayoutState {
   plots: PlotConfig[]
 
   // ─── Actions ─────────────────────────────────────────────────────────────────
+  setPlots: (plots: PlotConfig[]) => void
   addPlot: (plot: Omit<PlotConfig, 'id'>) => void
   removePlot: (id: string) => void
   updatePlot: (id: string, updates: Partial<Omit<PlotConfig, 'id'>>) => void
@@ -18,47 +21,46 @@ interface LayoutState {
   removeSeries: (plotId: string, seriesId: string) => void
 }
 
-export const useLayoutStore = create<LayoutState>()(
-  persist(
-    (set) => ({
-      plots: [],
+export const useLayoutStore = create<LayoutState>()((set) => ({
+  plots: [],
 
-      addPlot: (plot) => {
-        const id = `plot_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-        set(state => ({ plots: [...state.plots, { ...plot, id }] }))
-      },
+  // Wholesale-replaces the plot list — called by dashboardConfigSync when
+  // loading the shared config from Supabase.
+  setPlots: (plots) => set({ plots }),
 
-      removePlot: (id) => {
-        set(state => ({ plots: state.plots.filter(p => p.id !== id) }))
-      },
+  addPlot: (plot) => {
+    const id = `plot_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    set(state => ({ plots: [...state.plots, { ...plot, id }] }))
+  },
 
-      updatePlot: (id, updates) => {
-        set(state => ({
-          plots: state.plots.map(p => p.id === id ? { ...p, ...updates } : p),
-        }))
-      },
+  removePlot: (id) => {
+    set(state => ({ plots: state.plots.filter(p => p.id !== id) }))
+  },
 
-      addSeries: (plotId, series) => {
-        const id = `ser_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-        set(state => ({
-          plots: state.plots.map(p =>
-            p.id === plotId
-              ? { ...p, series: [...p.series, { ...series, id }] }
-              : p
-          ),
-        }))
-      },
+  updatePlot: (id, updates) => {
+    set(state => ({
+      plots: state.plots.map(p => p.id === id ? { ...p, ...updates } : p),
+    }))
+  },
 
-      removeSeries: (plotId, seriesId) => {
-        set(state => ({
-          plots: state.plots.map(p =>
-            p.id === plotId
-              ? { ...p, series: p.series.filter(s => s.id !== seriesId) }
-              : p
-          ),
-        }))
-      },
-    }),
-    { name: 'filippo-layout-v1' }
-  )
-)
+  addSeries: (plotId, series) => {
+    const id = `ser_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    set(state => ({
+      plots: state.plots.map(p =>
+        p.id === plotId
+          ? { ...p, series: [...p.series, { ...series, id }] }
+          : p
+      ),
+    }))
+  },
+
+  removeSeries: (plotId, seriesId) => {
+    set(state => ({
+      plots: state.plots.map(p =>
+        p.id === plotId
+          ? { ...p, series: p.series.filter(s => s.id !== seriesId) }
+          : p
+      ),
+    }))
+  },
+}))

@@ -5,6 +5,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { loadCompanies } from '../../data/loadCompanies'
+import { loadDashboardConfig, startDashboardConfigSync } from '../../data/dashboardConfigSync'
 import LoginForm from './LoginForm'
 
 export default function AuthGate({ children }: { children: ReactNode }) {
@@ -24,9 +25,15 @@ export default function AuthGate({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Fetch companies/P&L data from Supabase once a session is confirmed.
+  // Fetch companies/P&L data and the shared dashboard layout from Supabase
+  // once a session is confirmed, then start syncing any local edit to the
+  // chart layout / derived metrics back to that same shared row.
   useEffect(() => {
-    if (authed) loadCompanies().catch(err => console.error('No se pudieron cargar las empresas:', err))
+    if (!authed) return
+    loadCompanies().catch(err => console.error('No se pudieron cargar las empresas:', err))
+    loadDashboardConfig()
+      .catch(err => console.error('No se pudo cargar el dashboard:', err))
+      .finally(startDashboardConfigSync)
   }, [authed])
 
   if (checking) {

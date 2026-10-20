@@ -133,3 +133,58 @@ drop trigger if exists companies_touch on public.companies;
 create trigger companies_touch
   before update on public.companies
   for each row execute function public.companies_touch();
+
+-- ============================================================================
+-- dashboard_config — the shared dashboard layout (chart cards + derived
+-- metrics), stored as a single singleton row (id = 1). Every signed-in
+-- device loads this row on page load and writes it back ~1s after any edit,
+-- so every invited user sees the same charts regardless of which device or
+-- session created them — same singleton-row pattern as the TempSense
+-- dashboard's own dashboard_config table.
+-- ============================================================================
+create table if not exists public.dashboard_config (
+  id               smallint    primary key default 1,
+  plots            jsonb       not null default '[]'::jsonb,
+  derived_metrics  jsonb       not null default '[]'::jsonb,
+  updated_at       timestamptz not null default now(),
+  constraint dashboard_config_singleton check (id = 1)
+);
+
+alter table public.dashboard_config enable row level security;
+
+drop policy if exists "dashboard_config read" on public.dashboard_config;
+create policy "dashboard_config read"
+  on public.dashboard_config
+  for select
+  to authenticated
+  using (true);
+
+drop policy if exists "dashboard_config insert" on public.dashboard_config;
+create policy "dashboard_config insert"
+  on public.dashboard_config
+  for insert
+  to authenticated
+  with check (id = 1);
+
+drop policy if exists "dashboard_config update" on public.dashboard_config;
+create policy "dashboard_config update"
+  on public.dashboard_config
+  for update
+  to authenticated
+  using (id = 1)
+  with check (id = 1);
+
+-- No delete policy — the singleton row is never removed, only overwritten.
+
+create or replace function public.dashboard_config_touch()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists dashboard_config_touch on public.dashboard_config;
+create trigger dashboard_config_touch
+  before update on public.dashboard_config
+  for each row execute function public.dashboard_config_touch();
