@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import Modal from '../ui/Modal'
 import MetricSelector from '../metrics/MetricSelector'
+import MonthPicker from '../ui/MonthPicker'
 import { useDataStore } from '../../store/useDataStore'
 import { useMetricStore } from '../../store/useMetricStore'
 import { useLayoutStore } from '../../store/useLayoutStore'
 import type { ChartType, MetricRef, PlotSeries } from '../../types'
-import { formatDateFull } from '../../utils/dateUtils'
 
 // ─── SeriesForm ─────────────────────────────────────────────────────────────────
 // Local form state for one data series — richer than PlotSeries so the UI can
@@ -184,21 +184,19 @@ export default function AddPlotModal({ open, onClose, editingPlotId }: Props) {
         <div>
           <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Período</label>
           <div className="flex gap-2 items-center">
-            <select
+            <MonthPicker
               value={periodStart}
-              onChange={e => setPeriodStart(e.target.value)}
-              className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {dates.map(d => <option key={d} value={d}>{formatDateFull(d)}</option>)}
-            </select>
+              onChange={setPeriodStart}
+              availableDates={dates}
+              className="flex-1 text-sm"
+            />
             <span className="text-gray-400 text-sm">→</span>
-            <select
+            <MonthPicker
               value={periodEnd}
-              onChange={e => setPeriodEnd(e.target.value)}
-              className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {dates.map(d => <option key={d} value={d}>{formatDateFull(d)}</option>)}
-            </select>
+              onChange={setPeriodEnd}
+              availableDates={dates}
+              className="flex-1 text-sm"
+            />
           </div>
         </div>
 

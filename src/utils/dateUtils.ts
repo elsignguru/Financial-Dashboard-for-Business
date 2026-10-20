@@ -1,7 +1,7 @@
 // Date and number formatting utilities used throughout the dashboard UI.
 
 // ─── Spanish month name tables ──────────────────────────────────────────────────
-const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+export const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const MONTHS_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 // ─── Date formatters ────────────────────────────────────────────────────────────

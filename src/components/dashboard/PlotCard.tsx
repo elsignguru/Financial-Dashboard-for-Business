@@ -6,7 +6,7 @@ import { useLayoutStore } from '../../store/useLayoutStore'
 import { useDataStore } from '../../store/useDataStore'
 import ChartContainer from '../charts/ChartContainer'
 import AddPlotModal from './AddPlotModal'
-import { formatDateFull } from '../../utils/dateUtils'
+import MonthPicker from '../ui/MonthPicker'
 
 export default function PlotCard({ plot }: { plot: PlotConfig }) {
   const removePlot = useLayoutStore(s => s.removePlot)
@@ -23,22 +23,20 @@ export default function PlotCard({ plot }: { plot: PlotConfig }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-gray-800 truncate flex-1">{plot.title}</h3>
           <div className="flex items-center gap-1 ml-2 shrink-0">
-            {/* Period selectors — changing either updates the plot config in the store immediately */}
-            <select
+            {/* Period pickers — changing either updates the plot config in the store immediately */}
+            <MonthPicker
               value={plot.periodStart}
-              onChange={e => updatePlot(plot.id, { periodStart: e.target.value })}
-              className="text-xs border border-gray-200 rounded px-1 py-0.5 text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            >
-              {dates.map(d => <option key={d} value={d}>{formatDateFull(d)}</option>)}
-            </select>
+              onChange={v => updatePlot(plot.id, { periodStart: v })}
+              availableDates={dates}
+              className="text-xs text-gray-500"
+            />
             <span className="text-gray-300 text-xs">→</span>
-            <select
+            <MonthPicker
               value={plot.periodEnd}
-              onChange={e => updatePlot(plot.id, { periodEnd: e.target.value })}
-              className="text-xs border border-gray-200 rounded px-1 py-0.5 text-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            >
-              {dates.map(d => <option key={d} value={d}>{formatDateFull(d)}</option>)}
-            </select>
+              onChange={v => updatePlot(plot.id, { periodEnd: v })}
+              availableDates={dates}
+              className="text-xs text-gray-500"
+            />
             {/* Edit opens AddPlotModal pre-populated with this plot's config */}
             <button
               onClick={() => setEditing(true)}
