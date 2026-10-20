@@ -133,7 +133,7 @@ export default function ChartContainer({ plot }: { plot: PlotConfig }) {
             dataKey={`s${i}`}
             stroke={s.color}
             strokeWidth={2}
-            dot={false}
+            dot={{ r: 3, fill: s.color, strokeWidth: 0 }}
             connectNulls={false}
           />
         ))}
