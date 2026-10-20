@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Política de Privacidad — Dashboard Financiero Grupo Filippo</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 720px; margin: 2.5rem auto; padding: 0 1.25rem; color: #1f2937; line-height: 1.6; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  h2 { font-size: 1.05rem; margin-top: 2rem; color: #111827; }
+  p, li { font-size: 0.95rem; color: #374151; }
+  .updated { color: #6b7280; font-size: 0.85rem; margin-bottom: 2rem; }
+  a { color: #2563eb; }
+</style>
+</head>
+<body>
+  <h1>Política de Privacidad</h1>
+  <p class="updated">Dashboard Financiero — Grupo Filippo · Última actualización: 20 de octubre de 2026</p>
+
+  <p>
+    Esta aplicación es una herramienta interna de uso privado para Grupo Filippo. No está disponible
+    al público ni se ofrece a otras empresas. Esta página describe qué datos procesa, cómo se
+    almacenan y quién puede acceder a ellos.
+  </p>
+
+  <h2>Qué datos accedemos de QuickBooks Online</h2>
+  <p>
+    Con tu autorización explícita a través del flujo de conexión OAuth2 de Intuit, esta aplicación
+    lee únicamente dos tipos de información de QuickBooks Online:
+  </p>
+  <ul>
+    <li>El nombre de la empresa conectada (API de información de la empresa).</li>
+    <li>El reporte de Pérdidas y Ganancias (Profit &amp; Loss), desglosado por mes.</li>
+  </ul>
+  <p>
+    El acceso es estrictamente de <strong>solo lectura</strong>. Esta aplicación nunca crea, modifica
+    ni elimina ningún dato dentro de QuickBooks Online.
+  </p>
+
+  <h2>Cómo almacenamos los datos</h2>
+  <p>
+    Los datos sincronizados (el reporte financiero) y las credenciales de conexión OAuth se
+    almacenan en una base de datos privada (Supabase/PostgreSQL) con reglas de acceso a nivel de
+    fila que restringen la lectura solo a usuarios con sesión autenticada e invitada. Las
+    credenciales de QuickBooks nunca son accesibles desde el navegador ni se exponen a ningún
+    usuario de la aplicación.
+  </p>
+
+  <h2>Quién puede acceder</h2>
+  <p>
+    Solo las personas invitadas manualmente por el administrador de Grupo Filippo pueden iniciar
+    sesión en el dashboard. No existe registro público de usuarios.
+  </p>
+
+  <h2>Compartir con terceros</h2>
+  <p>
+    No vendemos, alquilamos ni compartimos tus datos financieros con terceros. Los únicos
+    proveedores de infraestructura utilizados son Vercel (alojamiento), Supabase (base de datos) e
+    Intuit/QuickBooks Online (origen de los datos), cada uno sujeto a sus propias políticas de
+    privacidad.
+  </p>
+
+  <h2>Cómo revocar el acceso</h2>
+  <p>
+    Puedes desconectar cualquier empresa de QuickBooks en cualquier momento desde el dashboard
+    (botón "Desconectar" junto al nombre de la empresa), lo cual elimina de forma permanente las
+    credenciales y los datos sincronizados de esa empresa. También puedes revocar el acceso
+    directamente desde tu cuenta de Intuit/QuickBooks.
+  </p>
+
+  <h2>Contacto</h2>
+  <p>
+    Para preguntas sobre esta política, contactar a: <a href="mailto:elsignguru@gmail.com">elsignguru@gmail.com</a>
+  </p>
+</body>
+</html>
