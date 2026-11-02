@@ -27,7 +27,13 @@ interface SeriesForm {
 
 function newSeries(defaultCompanyId: string): SeriesForm {
   return {
-    tempId: `tmp_${Date.now()}`,
+    // Random suffix matters: Date.now() alone has only millisecond
+    // resolution, so clicking "+ Agregar serie" a few times quickly (e.g.
+    // setting up one series per company for several companies) can produce
+    // duplicate tempIds. Since series cards are keyed by tempId and
+    // updateSeries()/delete match on it, a collision makes two different
+    // series silently mirror or delete each other.
+    tempId: `tmp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     label: '',
     mode: 'raw',
     companyId: defaultCompanyId,
