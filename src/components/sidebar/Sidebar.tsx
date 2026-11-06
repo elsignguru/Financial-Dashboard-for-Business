@@ -9,6 +9,7 @@ import CompaniesPanel from '../companies/CompaniesPanel'
 import DerivedMetricModal from './DerivedMetricModal'
 import { syncCompanyNow } from '../../lib/qboApi'
 import { loadCompanies } from '../../data/loadCompanies'
+import { supabase } from '../../lib/supabaseClient'
 
 // ─── CompanySection ─────────────────────────────────────────────────────────────
 // Collapsible card for a single company. Shows metric count, a search box,
@@ -156,9 +157,18 @@ export default function Sidebar() {
     <>
       <aside className="w-64 shrink-0 bg-white border-r border-gray-200 flex flex-col h-full overflow-y-auto">
         {/* Logo / title */}
-        <div className="px-4 py-4 border-b border-gray-200">
-          <h1 className="text-base font-bold text-gray-900">Grupo Filippo</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Dashboard Financiero</p>
+        <div className="px-4 py-4 border-b border-gray-200 flex items-start justify-between gap-2">
+          <div>
+            <h1 className="text-base font-bold text-gray-900">Grupo Filippo</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Dashboard Financiero</p>
+          </div>
+          <button
+            onClick={() => { if (confirm('¿Cerrar sesión?')) supabase.auth.signOut() }}
+            title="Cerrar sesión"
+            className="shrink-0 text-xs text-gray-400 hover:text-red-500 mt-0.5"
+          >
+            Salir
+          </button>
         </div>
 
         <div className="flex-1 px-3 py-3 space-y-4 overflow-y-auto">
