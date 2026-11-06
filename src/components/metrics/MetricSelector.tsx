@@ -50,7 +50,14 @@ export default function MetricSelector({ companies, selectedCompanyId, selectedM
       {companies.length > 1 && (
         <select
           value={selectedCompanyId}
-          onChange={e => { onCompanyChange(e.target.value); onMetricChange('') }}
+          // Only onCompanyChange — both call sites already reset their own
+          // metric selection as part of that same update. Also calling
+          // onMetricChange('') here used to be redundant at best, and at
+          // worst (AddPlotModal's raw mode) actively wrong: that handler
+          // re-asserts a `companyId` captured from before this click, so
+          // chaining it immediately after onCompanyChange silently stamped
+          // the company selection back to its old value on every change.
+          onChange={e => onCompanyChange(e.target.value)}
           className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">— Empresa —</option>
