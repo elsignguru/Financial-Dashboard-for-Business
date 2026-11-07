@@ -10,6 +10,7 @@ import DerivedMetricModal from './DerivedMetricModal'
 import { syncCompanyNow } from '../../lib/qboApi'
 import { loadCompanies } from '../../data/loadCompanies'
 import { supabase } from '../../lib/supabaseClient'
+import { describeDerivedMetric } from '../../utils/derivedMetric'
 
 // ─── CompanySection ─────────────────────────────────────────────────────────────
 // Collapsible card for a single company. Shows metric count, a search box,
@@ -201,7 +202,7 @@ export default function Sidebar() {
                   <div key={dm.id} className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-gray-50 group">
                     <div className="min-w-0">
                       <p className="text-sm text-gray-700 truncate">{dm.name}</p>
-                      <p className="text-xs text-gray-400">A {dm.operator} B</p>
+                      <p className="text-xs text-gray-400 truncate">{describeDerivedMetric(dm)}</p>
                     </div>
                     <button
                       onClick={() => { if (confirm(`¿Eliminar "${dm.name}"?`)) removeDerived(dm.id) }}

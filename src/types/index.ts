@@ -72,13 +72,21 @@ export interface PlotConfig {
 
 // ─── Derived metrics ───────────────────────────────────────────────────────────
 
-// A user-created formula that combines two MetricRefs with an arithmetic operator.
+// One additional operand chained onto a derived metric, combined with the
+// running total via `operator` (e.g. the "+ C" in "A + B + C").
+export interface DerivedMetricTerm {
+  operator: Operator
+  operand: MetricRef
+}
+
+// A user-created formula combining any number of MetricRefs left-to-right:
+// `base`, then each term's operator applied against the running result in
+// order — e.g. base=A, terms=[{+, B}, {−, C}] means (A + B) − C.
 export interface DerivedMetric {
   id: string
   name: string
-  operandA: MetricRef
-  operator: Operator
-  operandB: MetricRef
+  base: MetricRef
+  terms: DerivedMetricTerm[]
 }
 
 // A resolved data point returned by resolveMetric — one month's value for a series.

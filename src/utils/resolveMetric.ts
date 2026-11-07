@@ -1,6 +1,6 @@
 // Resolves a MetricRef into an array of TimeSeriesPoints for a given date range.
 // This is the core data-fetching layer — charts call resolveMetric to get the values they render.
-import type { Company, DerivedMetric, MetricRef, TimeSeriesPoint } from '../types'
+import type { Company, DerivedMetric, MetricRef, Operator, TimeSeriesPoint } from '../types'
 
 // ─── Resolution strategies ──────────────────────────────────────────────────────
 
@@ -47,6 +47,25 @@ function resolveCombined(
   })
 }
 
+function applyOperator(a: number, b: number, operator: Operator): number | null {
+  if (operator === '+') return a + b
+  if (operator === '-') return a - b
+  if (operator === '*') return a * b
+  if (operator === '/') return b !== 0 ? a / b : null
+  return null
+}
+
+// Combines two already-resolved series point-by-point by date. Null wherever
+// either side is null (or missing), matching how a single A op B pair always behaved.
+function combineSeries(a: TimeSeriesPoint[], b: TimeSeriesPoint[], operator: Operator): TimeSeriesPoint[] {
+  const bMap = new Map(b.map(p => [p.date, p.value]))
+  return a.map(p => {
+    const bVal = bMap.get(p.date)
+    if (p.value == null || bVal == null) return { date: p.date, value: null }
+    return { date: p.date, value: applyOperator(p.value, bVal, operator) }
+  })
+}
+
 // ─── Main resolver ──────────────────────────────────────────────────────────────
 
 // Dispatches to the correct strategy based on the MetricRef type.
@@ -67,18 +86,12 @@ export function resolveMetric(
   if (ref.type === 'derived') {
     const dm = derivedMetrics.find(d => d.id === ref.derivedMetricId)
     if (!dm) return []
-    const aPoints = resolveMetric(dm.operandA, start, end, companies, derivedMetrics)
-    const bPoints = resolveMetric(dm.operandB, start, end, companies, derivedMetrics)
-    const bMap = new Map(bPoints.map(p => [p.date, p.value]))
-    return aPoints.map(p => {
-      const bVal = bMap.get(p.date)
-      if (p.value == null || bVal == null) return { date: p.date, value: null }
-      if (dm.operator === '+') return { date: p.date, value: p.value + bVal }
-      if (dm.operator === '-') return { date: p.date, value: p.value - bVal }
-      if (dm.operator === '*') return { date: p.date, value: p.value * bVal }
-      if (dm.operator === '/') return { date: p.date, value: bVal !== 0 ? p.value / bVal : null }
-      return { date: p.date, value: null }
-    })
+    let result = resolveMetric(dm.base, start, end, companies, derivedMetrics)
+    for (const term of dm.terms) {
+      const termPoints = resolveMetric(term.operand, start, end, companies, derivedMetrics)
+      result = combineSeries(result, termPoints, term.operator)
+    }
+    return result
   }
   return []
 }
