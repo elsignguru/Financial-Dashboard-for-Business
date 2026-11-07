@@ -55,14 +55,49 @@ function applyOperator(a: number, b: number, operator: Operator): number | null 
   return null
 }
 
-// Combines two already-resolved series point-by-point by date. Null wherever
-// either side is null (or missing), matching how a single A op B pair always behaved.
-function combineSeries(a: TimeSeriesPoint[], b: TimeSeriesPoint[], operator: Operator): TimeSeriesPoint[] {
-  const bMap = new Map(b.map(p => [p.date, p.value]))
-  return a.map(p => {
-    const bVal = bMap.get(p.date)
-    if (p.value == null || bVal == null) return { date: p.date, value: null }
-    return { date: p.date, value: applyOperator(p.value, bVal, operator) }
+// Folds a derived metric's base + chained terms into one series, one month
+// at a time. A missing operand (QuickBooks has no transactions posted to
+// that account that month — see qboTransform.ts's parseValue, which is
+// exactly where that null first comes from) counts as 0 for the arithmetic,
+// same rule resolveCombined already uses when summing across companies —
+// only when EVERY operand is missing that month does the result stay null,
+// so a period with no data anywhere isn't misrepresented as a hard zero.
+// A genuine divide-by-zero mid-chain nulls the whole month instead of
+// silently resetting to 0 and continuing, since that's a real error, not
+// just absent data.
+function resolveDerived(
+  dm: DerivedMetric,
+  start: string,
+  end: string,
+  companies: Company[],
+  derivedMetrics: DerivedMetric[]
+): TimeSeriesPoint[] {
+  const basePoints = resolveMetric(dm.base, start, end, companies, derivedMetrics)
+  const termSeries = dm.terms.map(term => ({
+    operator: term.operator,
+    points: resolveMetric(term.operand, start, end, companies, derivedMetrics),
+  }))
+
+  const allDates = new Set(basePoints.map(p => p.date))
+  for (const t of termSeries) for (const p of t.points) allDates.add(p.date)
+
+  const baseMap = new Map(basePoints.map(p => [p.date, p.value]))
+  const termMaps = termSeries.map(t => ({ operator: t.operator, map: new Map(t.points.map(p => [p.date, p.value])) }))
+
+  return Array.from(allDates).sort().map(date => {
+    let result = baseMap.get(date) ?? 0
+    let anyValue = (baseMap.get(date) ?? null) != null
+    let invalid = false
+
+    for (const t of termMaps) {
+      const raw = t.map.get(date) ?? null
+      if (raw != null) anyValue = true
+      const next = applyOperator(result, raw ?? 0, t.operator)
+      if (next == null) { invalid = true; break }
+      result = next
+    }
+
+    return { date, value: invalid || !anyValue ? null : result }
   })
 }
 
@@ -86,12 +121,7 @@ export function resolveMetric(
   if (ref.type === 'derived') {
     const dm = derivedMetrics.find(d => d.id === ref.derivedMetricId)
     if (!dm) return []
-    let result = resolveMetric(dm.base, start, end, companies, derivedMetrics)
-    for (const term of dm.terms) {
-      const termPoints = resolveMetric(term.operand, start, end, companies, derivedMetrics)
-      result = combineSeries(result, termPoints, term.operator)
-    }
-    return result
+    return resolveDerived(dm, start, end, companies, derivedMetrics)
   }
   return []
 }
