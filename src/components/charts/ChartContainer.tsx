@@ -2,7 +2,7 @@
 // Supports three chart types: line, bar, and pie.
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine, ResponsiveContainer
 } from 'recharts'
 import type { PlotConfig, TimeSeriesPoint } from '../../types'
 import { useDataStore } from '../../store/useDataStore'
@@ -136,6 +136,8 @@ export default function ChartContainer({ plot }: { plot: PlotConfig }) {
           <YAxis domain={yScale.domain} ticks={yScale.ticks} tickFormatter={formatValueShort} tick={{ fontSize: 11 }} width={56} />
           <Tooltip content={<CustomTooltip />} />
           {seriesData.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
+          {/* Thicker black zero line so positive/negative values read clearly at a glance. */}
+          <ReferenceLine y={0} stroke="#000" strokeWidth={2} />
           {seriesData.map((s, i) => (
             <Bar key={`s${i}`} name={s.label} dataKey={`s${i}`} fill={s.color} radius={[2, 2, 0, 0]} />
           ))}
@@ -153,6 +155,8 @@ export default function ChartContainer({ plot }: { plot: PlotConfig }) {
         <YAxis domain={yScale.domain} ticks={yScale.ticks} tickFormatter={formatValueShort} tick={{ fontSize: 11 }} width={56} />
         <Tooltip content={<CustomTooltip />} />
         {seriesData.length > 1 && <Legend wrapperStyle={{ fontSize: 12 }} />}
+        {/* Thicker black zero line so positive/negative values read clearly at a glance. */}
+        <ReferenceLine y={0} stroke="#000" strokeWidth={2} />
         {seriesData.map((s, i) => (
           <Line
             key={`s${i}`}
